@@ -1,9 +1,10 @@
 {
   "domain": "wwebjs",
   "name": "WWebJS",
-  "codeowners": [],
+  "codeowners": ["@ricobach"],
   "config_flow": true,
-  "documentation": "https://github.com/avoylenko/wwebjs-api",
+  "documentation": "https://github.com/ricobach/HA-WWebJS",
+  "issue_tracker": "https://github.com/ricobach/HA-WWebJS/issues",
   "integration_type": "service",
   "iot_class": "local_polling",
   "requirements": [],
