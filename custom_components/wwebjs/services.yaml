@@ -1,0 +1,26 @@
+send_message:
+  name: Send message
+  description: Send a plain text message through a configured WWebJS sender session.
+  fields:
+    session:
+      name: Session
+      description: WWebJS session/sender name.
+      required: true
+      example: rico
+      selector:
+        text:
+    target:
+      name: Target
+      description: International phone number or raw WWebJS chat ID.
+      required: true
+      example: "+4512345678"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Text to send.
+      required: true
+      example: "Hello from Home Assistant"
+      selector:
+        text:
+          multiline: true
