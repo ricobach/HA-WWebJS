@@ -35,6 +35,8 @@ from .const import (
 from .coordinator import WWebJSHealthManager
 from .lifecycle import WWebJSLifecycleManager
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 @dataclass(slots=True)
 class WWebJSRuntimeData:

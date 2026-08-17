@@ -1,12 +1,14 @@
 {
   "domain": "wwebjs",
   "name": "WWebJS",
-  "codeowners": ["@ricobach"],
+  "codeowners": [
+    "@ricobach"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/ricobach/HA-WWebJS",
-  "issue_tracker": "https://github.com/ricobach/HA-WWebJS/issues",
   "integration_type": "service",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/ricobach/HA-WWebJS/issues",
   "requirements": [],
   "version": "0.2.0"
 }
