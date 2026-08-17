@@ -1,6 +1,6 @@
 send_message:
   name: Send message
-  description: Send a plain text message through a configured WWebJS sender session.
+  description: Send text or media through a configured WWebJS sender session.
   fields:
     session:
       name: Session
@@ -18,9 +18,59 @@ send_message:
         text:
     message:
       name: Message
-      description: Text to send.
-      required: true
-      example: "Hello from Home Assistant"
+      description: Text message, or caption when media/image is supplied.
+      required: false
+      example: "Someone is at the front door"
       selector:
         text:
           multiline: true
+    media:
+      name: Media
+      description: HTTP(S) URL or local file path for image, video, audio, or document media.
+      required: false
+      example: "/config/www/snapshots/frontdoor.jpg"
+      selector:
+        text:
+    image:
+      name: Image
+      description: Alias of media for image-focused automations.
+      required: false
+      example: "https://example.com/frontdoor.jpg"
+      selector:
+        text:
+    delete_after:
+      name: Delete after
+      description: Delete the message after this many seconds, whether read or unread.
+      required: false
+      example: 600
+      selector:
+        number:
+          min: 1
+          max: 604800
+          mode: box
+          unit_of_measurement: seconds
+    delete_if_unread_after:
+      name: Delete if unread after
+      description: Delete the message after this many seconds if WWebJS does not report that it was read.
+      required: false
+      example: 300
+      selector:
+        number:
+          min: 1
+          max: 604800
+          mode: box
+          unit_of_measurement: seconds
+    cleanup_key:
+      name: Cleanup key
+      description: Logical key for temporary notifications. A newer message with the same session, target, and key deletes older tracked messages.
+      required: false
+      example: front_door
+      selector:
+        text:
+    delete_for_everyone:
+      name: Delete for everyone
+      description: Revoke cleanup messages for the receiver too when WhatsApp allows it.
+      required: false
+      default: true
+      selector:
+        boolean:
