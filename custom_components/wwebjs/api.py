@@ -137,37 +137,78 @@ def normalize_target(value: str) -> str:
 
 
 def extract_message_id(data: Any) -> str | None:
-    """Extract a message ID from common wwebjs-api response envelopes."""
+    """Extract the raw WhatsApp message ID from a wwebjs-api response.
+
+    wwebjs-api returns ``{success: true, message: messageOut}``. Depending on
+    whatsapp-web.js/WhatsApp Web versions, the Message ID may be exposed on
+    ``message.id`` or only inside ``message._data.id``. Recent WhatsApp Web
+    builds have also renamed ``_serialized`` to ``$1`` in some ID objects.
+
+    The wwebjs-api message endpoints accept the raw ``id`` component together
+    with ``chatId``, so prefer that value when it is available.
+    """
+    if isinstance(data, list):
+        for item in data:
+            found = extract_message_id(item)
+            if found:
+                return found
+        return None
+
     if not isinstance(data, dict):
         return None
+
     for key in ("messageId", "message_id"):
         value = data.get(key)
         if isinstance(value, str) and value:
             return value
+
     identifier = data.get("id")
+    if isinstance(identifier, str) and identifier:
+        return identifier
+
     if isinstance(identifier, dict):
         raw_id = identifier.get("id")
         if isinstance(raw_id, str) and raw_id:
             return raw_id
-        serialized = identifier.get("_serialized")
-        if isinstance(serialized, str) and serialized:
-            return serialized
-    for key in ("result", "data", "message"):
+
+        # Fallbacks for versions where only the serialized key survives JSON.
+        for key in ("_serialized", "$1"):
+            serialized = identifier.get(key)
+            if isinstance(serialized, str) and serialized:
+                # A serialized message key is usually
+                # <fromMe>_<remote>_<raw-id>. Return the raw suffix because
+                # wwebjs-api fetchMessages({messageId}) expects the message ID.
+                parts = serialized.rsplit("_", 1)
+                return parts[-1] if len(parts) == 2 else serialized
+
+    # Prefer known envelopes first, including Message.rawData/_data.
+    for key in ("message", "result", "data", "_data"):
         value = data.get(key)
-        if isinstance(value, dict):
+        if isinstance(value, (dict, list)):
             found = extract_message_id(value)
             if found:
                 return found
+
+    # Be tolerant of additional upstream envelopes without relying on their
+    # exact property names.
+    for key, value in data.items():
+        if key in {"message", "result", "data", "_data", "id"}:
+            continue
+        if isinstance(value, (dict, list)):
+            found = extract_message_id(value)
+            if found:
+                return found
+
     return None
 
 
 def unwrap_message_info(data: Any) -> dict[str, Any] | None:
-    """Unwrap message info from possible API response envelopes."""
+    """Unwrap message delivery/read info from wwebjs-api responses."""
     if not isinstance(data, dict):
         return None
     if any(key in data for key in ("read", "readRemaining", "delivery", "deliveryRemaining")):
         return data
-    for key in ("result", "data", "message"):
+    for key in ("info", "result", "data", "message"):
         value = data.get(key)
         if isinstance(value, dict):
             found = unwrap_message_info(value)
