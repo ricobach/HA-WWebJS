@@ -1,0 +1,11 @@
+{
+  "domain": "wwebjs",
+  "name": "WWebJS",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/avoylenko/wwebjs-api",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}
