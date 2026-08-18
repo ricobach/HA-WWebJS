@@ -8,7 +8,8 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components.camera import async_get_image
+from homeassistant.components.camera import async_get_image as async_get_camera_image
+from homeassistant.components.image import async_get_image as async_get_image_entity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -254,18 +255,21 @@ async def _async_send_message(
             )
 
         if media_entity:
-            if not media_entity.startswith("camera."):
+            if media_entity.startswith("camera."):
+                entity_image = await async_get_camera_image(hass, media_entity)
+            elif media_entity.startswith("image."):
+                entity_image = await async_get_image_entity(hass, media_entity)
+            else:
                 raise HomeAssistantError(
-                    "media_entity currently supports camera entities"
+                    "media_entity supports camera and image entities"
                 )
-            camera_image = await async_get_image(hass, media_entity)
-            kind = "camera"
+            kind = "entity_media"
             response = await api.send_media_bytes(
                 session_id,
                 target,
-                camera_image.content,
+                entity_image.content,
                 f"{slugify(media_entity)}.jpg",
-                mimetype=camera_image.content_type,
+                mimetype=entity_image.content_type,
                 caption=message or None,
             )
         elif media_source:
