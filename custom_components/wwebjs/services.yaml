@@ -38,11 +38,13 @@ send_message:
         text:
     media_entity:
       name: Home Assistant media entity
-      description: Camera entity to snapshot and send directly.
+      description: Camera or image entity to fetch and send directly.
       required: false
       selector:
         entity:
-          domain: camera
+          domain:
+            - camera
+            - image
     delete_after:
       name: Delete after
       description: Delete the message after this many seconds, whether read or unread.
