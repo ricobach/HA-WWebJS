@@ -12,7 +12,7 @@ A Home Assistant custom integration for [wwebjs-api](https://github.com/avoylenk
 - Phone-number pairing codes
 - Plain text messages
 - Images, video, audio and document media from HTTP(S) URLs or local files
-- Send a live snapshot directly from a Home Assistant `camera.*` entity
+- Send media directly from Home Assistant `camera.*` and `image.*` entities
 - `notify.wwebjs_<session>` services with dynamic recipients
 - Send a WhatsApp location from a `person.*` or `device_tracker.*` entity
 - Session health monitoring
@@ -89,9 +89,9 @@ data:
 
 The `message` becomes the media caption.
 
-## Send a Home Assistant camera snapshot
+## Send media from a Home Assistant entity
 
-WWebJS can request a current image directly from a Home Assistant camera entity and send it without first writing a snapshot file.
+WWebJS can request the current image directly from a Home Assistant `camera.*` or `image.*` entity and send it without first writing a snapshot file.
 
 ```yaml
 action: wwebjs.send_message
@@ -100,6 +100,17 @@ data:
   target: "+4512345678"
   message: "Front door camera"
   media_entity: camera.front_door
+```
+
+An image entity works the same way:
+
+```yaml
+action: wwebjs.send_message
+data:
+  session: rico
+  target: "+4512345678"
+  message: "Latest generated image"
+  media_entity: image.latest_snapshot
 ```
 
 The same option can be used through a session notify service:
@@ -112,8 +123,6 @@ data:
   data:
     media_entity: camera.front_door
 ```
-
-`media_entity` currently supports `camera.*` entities.
 
 ## Send a person or device location
 
@@ -154,7 +163,7 @@ The session device also exposes:
 
 Health checks run every 60 seconds. Automatic recovery starts after three consecutive transient failures. Retry delays increase from 1 minute to 5, 15 and then 30 minutes to avoid restart loops.
 
-Authentication and pairing-related states suspend automatic recovery instead of repeatedly restarting a session that needs user action. Pressing **Start** or **Restart** resumes recovery. Pressing **Stop** intentionally suspends automatic recovery for that session.
+Authentication, pairing, blocked-account/proxy and deprecated-client states suspend automatic recovery instead of repeatedly restarting a session that needs user or upstream action. Pressing **Start** or **Restart** resumes recovery. Pressing **Stop** intentionally suspends automatic recovery for that running Home Assistant instance.
 
 If the API server itself is unreachable, WWebJS reports `API_UNAVAILABLE` and does not repeatedly restart sessions.
 
@@ -164,7 +173,7 @@ Each session has a **Message history** diagnostic sensor. It stores a small pers
 
 - Timestamp
 - Recipient
-- Message type (`text`, `media`, `camera`, or `location`)
+- Message type (`text`, `media`, `entity_media`, or `location`)
 - Sent/failed state
 - Short message/caption preview
 - Source Home Assistant entity when applicable
