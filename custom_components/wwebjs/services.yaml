@@ -18,7 +18,7 @@ send_message:
         text:
     message:
       name: Message
-      description: Text message, or caption when media/image is supplied.
+      description: Text message, or caption when media is supplied.
       required: false
       example: "Someone is at the front door"
       selector:
@@ -28,21 +28,25 @@ send_message:
       name: Media
       description: HTTP(S) URL or local file path for image, video, audio, or document media.
       required: false
-      example: "/config/www/snapshots/frontdoor.jpg"
       selector:
         text:
     image:
       name: Image
       description: Alias of media for image-focused automations.
       required: false
-      example: "https://example.com/frontdoor.jpg"
       selector:
         text:
+    media_entity:
+      name: Home Assistant media entity
+      description: Camera entity to snapshot and send directly.
+      required: false
+      selector:
+        entity:
+          domain: camera
     delete_after:
       name: Delete after
       description: Delete the message after this many seconds, whether read or unread.
       required: false
-      example: 600
       selector:
         number:
           min: 1
@@ -53,7 +57,6 @@ send_message:
       name: Delete if unread after
       description: Delete the message after this many seconds if WWebJS does not report that it was read.
       required: false
-      example: 300
       selector:
         number:
           min: 1
@@ -64,7 +67,6 @@ send_message:
       name: Cleanup key
       description: Logical key for temporary notifications. A newer message with the same session, target, and key deletes older tracked messages.
       required: false
-      example: front_door
       selector:
         text:
     delete_for_everyone:
@@ -74,3 +76,35 @@ send_message:
       default: true
       selector:
         boolean:
+
+send_location:
+  name: Send location
+  description: Send the GPS location of a Home Assistant person or device tracker.
+  fields:
+    session:
+      name: Session
+      description: WWebJS session/sender name.
+      required: true
+      selector:
+        text:
+    target:
+      name: Target
+      description: International phone number or raw WWebJS chat ID.
+      required: true
+      selector:
+        text:
+    location_entity:
+      name: Location entity
+      description: Person or device tracker with latitude and longitude attributes.
+      required: true
+      selector:
+        entity:
+          domain:
+            - person
+            - device_tracker
+    description:
+      name: Description
+      description: Optional WhatsApp location label. Defaults to the entity friendly name.
+      required: false
+      selector:
+        text:
