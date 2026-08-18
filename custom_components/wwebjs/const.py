@@ -37,15 +37,26 @@ HEALTH_RECOVERY_BACKOFF = (
     timedelta(minutes=15),
     timedelta(minutes=30),
 )
+# States where a restart loop is unlikely to help and user/upstream action is
+# required. These mirror whatsapp-web.js WAState values where applicable.
 HEALTH_AUTH_FAILURE_STATES = {
     "AUTH_FAILURE",
-    "UNPAIRED",
+    "DEPRECATED_VERSION",
     "PAIRING",
+    "PROXYBLOCK",
     "QR_RECEIVED",
+    "SMB_TOS_BLOCK",
+    "TOS_BLOCK",
+    "UNPAIRED",
+    "UNPAIRED_IDLE",
 }
+# States where restarting/recreating the local client is a reasonable recovery.
 HEALTH_TRANSIENT_STATES = {
+    "CONFLICT",
     "DISCONNECTED",
     "ERROR",
+    "OPENING",
+    "TIMEOUT",
     "UNKNOWN",
     "UNLAUNCHED",
 }
