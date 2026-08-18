@@ -15,10 +15,7 @@ A Home Assistant custom integration for [wwebjs-api](https://github.com/avoylenk
 - Session health monitoring
 - Automatic restart after three consecutive unhealthy checks
 - Five-minute restart cooldown to avoid restart loops
-- Persisted message cleanup across Home Assistant restarts
-- Delete messages after a timeout
-- Delete messages after a timeout only when unread
-- Cleanup keys that automatically remove superseded notifications
+- Message lifecycle/cleanup support is implemented, but deletion is currently blocked by an upstream `whatsapp-web.js` message-ID regression (see below)
 
 ## Installation with HACS
 
@@ -66,6 +63,15 @@ The `message` becomes the media caption.
 
 ## Temporary notification cleanup
 
+> [!IMPORTANT]
+> **Message deletion/cleanup does not currently work with the normal upstream `wwebjs-api` / `whatsapp-web.js` combination.**
+>
+> The lifecycle options are implemented in this Home Assistant integration, but current `whatsapp-web.js` builds are affected by a WhatsApp Web change where the serialized message-ID property moved from `_serialized` to `$1`. As a result, `wwebjs-api` can successfully send a message while returning only `{ "success": true }` without the message object/ID that deletion and other `/message/*` operations require.
+>
+> Upstream `whatsapp-web.js` PR [#201832](https://github.com/wwebjs/whatsapp-web.js/pull/201832) addresses this regression, including the `sendMessage` empty-result problem. Until an upstream fix is merged and included in the version used by `wwebjs-api`, treat the cleanup options below as **not operational**.
+
+The intended cleanup interface is documented below so automations can be prepared for when upstream message IDs are reliable again.
+
 Always revoke after 10 minutes:
 
 ```yaml
@@ -101,7 +107,7 @@ data:
   delete_after: 900
 ```
 
-After the new message is successfully sent, older tracked messages with the same session, recipient and `cleanup_key` are revoked.
+When the upstream message-ID issue is resolved, a newer message with the same session, recipient and `cleanup_key` will allow older tracked messages to be revoked.
 
 `delete_for_everyone` defaults to `true`. WhatsApp ultimately decides whether a message can still be revoked for all participants.
 
@@ -118,7 +124,7 @@ If the API server itself is unreachable, the integration reports `API_UNAVAILABL
 
 ## Notes about unread cleanup
 
-Unread cleanup uses the upstream `/message/getInfo` read-receipt data. Read information from WhatsApp Web is not guaranteed to be available or perfectly accurate in every version. When read information cannot be obtained, WWebJS keeps the tracked message and retries instead of deleting it blindly.
+Unread cleanup depends on two upstream capabilities: a reliable message ID from the send operation and `/message/getInfo` read-receipt data. At the moment, the message-ID regression described above prevents lifecycle cleanup from being scheduled reliably. Once message IDs are available again, read information from WhatsApp Web may still vary by version; if read information cannot be obtained, WWebJS keeps the tracked message and retries instead of deleting it blindly.
 
 ## License
 
