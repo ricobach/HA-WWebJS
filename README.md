@@ -12,9 +12,13 @@ A Home Assistant custom integration for [wwebjs-api](https://github.com/avoylenk
 - Phone-number pairing codes
 - Plain text messages
 - Images, video, audio and document media from HTTP(S) URLs or local files
+- Send a live snapshot directly from a Home Assistant `camera.*` entity
+- `notify.wwebjs_<session>` services with dynamic recipients
+- Send a WhatsApp location from a `person.*` or `device_tracker.*` entity
 - Session health monitoring
-- Automatic restart after three consecutive unhealthy checks
-- Five-minute restart cooldown to avoid restart loops
+- Start, stop and restart buttons for each sender session
+- Automatic recovery with authentication-aware suspension and escalating retry backoff
+- Persisted outbound message history diagnostics
 - Message lifecycle/cleanup support is implemented, but deletion is currently blocked by an upstream `whatsapp-web.js` message-ID regression (see below)
 
 ## Installation with HACS
@@ -33,6 +37,30 @@ data:
   session: rico
   target: "+4512345678"
   message: "Hello from Home Assistant"
+```
+
+## Notify services
+
+Each configured sender session also registers a notify service using the same session name.
+
+For a session named `rico`:
+
+```yaml
+action: notify.wwebjs_rico
+data:
+  target: "+4512345678"
+  message: "Hello from the Rico sender"
+```
+
+Multiple recipients can be supplied as a list:
+
+```yaml
+action: notify.wwebjs_rico
+data:
+  target:
+    - "+4511111111"
+    - "+4522222222"
+  message: "The alarm is armed"
 ```
 
 ## Image or other media
@@ -60,6 +88,89 @@ data:
 ```
 
 The `message` becomes the media caption.
+
+## Send a Home Assistant camera snapshot
+
+WWebJS can request a current image directly from a Home Assistant camera entity and send it without first writing a snapshot file.
+
+```yaml
+action: wwebjs.send_message
+data:
+  session: rico
+  target: "+4512345678"
+  message: "Front door camera"
+  media_entity: camera.front_door
+```
+
+The same option can be used through a session notify service:
+
+```yaml
+action: notify.wwebjs_rico
+data:
+  target: "+4512345678"
+  message: "Front door camera"
+  data:
+    media_entity: camera.front_door
+```
+
+`media_entity` currently supports `camera.*` entities.
+
+## Send a person or device location
+
+A `person.*` or `device_tracker.*` entity that exposes latitude and longitude can be sent as a native WhatsApp location.
+
+```yaml
+action: wwebjs.send_location
+data:
+  session: rico
+  target: "+4512345678"
+  location_entity: person.rico
+```
+
+An optional label can be supplied:
+
+```yaml
+action: wwebjs.send_location
+data:
+  session: rico
+  target: "+4512345678"
+  location_entity: device_tracker.phone
+  description: "Current phone location"
+```
+
+## Session management and recovery
+
+Each configured sender gets Home Assistant controls for:
+
+- **Start**
+- **Restart**
+- **Stop**
+
+The session device also exposes:
+
+- **Session status**
+- **Recovery count**
+- **Message history**
+
+Health checks run every 60 seconds. Automatic recovery starts after three consecutive transient failures. Retry delays increase from 1 minute to 5, 15 and then 30 minutes to avoid restart loops.
+
+Authentication and pairing-related states suspend automatic recovery instead of repeatedly restarting a session that needs user action. Pressing **Start** or **Restart** resumes recovery. Pressing **Stop** intentionally suspends automatic recovery for that session.
+
+If the API server itself is unreachable, WWebJS reports `API_UNAVAILABLE` and does not repeatedly restart sessions.
+
+## Message history diagnostics
+
+Each session has a **Message history** diagnostic sensor. It stores a small persisted ring buffer of recent outbound attempts, including:
+
+- Timestamp
+- Recipient
+- Message type (`text`, `media`, `camera`, or `location`)
+- Sent/failed state
+- Short message/caption preview
+- Source Home Assistant entity when applicable
+- Error details for failed sends
+
+The sensor state reflects the latest send result and its `recent` attribute contains the latest history entries.
 
 ## Temporary notification cleanup
 
@@ -110,17 +221,6 @@ data:
 When the upstream message-ID issue is resolved, a newer message with the same session, recipient and `cleanup_key` will allow older tracked messages to be revoked.
 
 `delete_for_everyone` defaults to `true`. WhatsApp ultimately decides whether a message can still be revoked for all participants.
-
-## Session health and recovery
-
-Each configured session gets diagnostic sensors:
-
-- `Session status`
-- `Recovery count`
-
-The integration checks the WWebJS API and each configured session every 60 seconds. A session that remains unhealthy for three checks is restarted automatically. Restarts have a five-minute cooldown to avoid restart loops.
-
-If the API server itself is unreachable, the integration reports `API_UNAVAILABLE` and does not repeatedly restart sessions.
 
 ## Notes about unread cleanup
 
