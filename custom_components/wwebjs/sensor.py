@@ -123,6 +123,7 @@ class WWebJSSessionStatusSensor(WWebJSHealthSensor):
             "last_error": state.last_error,
             "recovery_failures": state.recovery_failures,
             "recovery_suspended": state.recovery_suspended,
+            "recovery_suspended_reason": state.recovery_suspended_reason,
             "next_recovery": state.next_recovery,
         }
 
