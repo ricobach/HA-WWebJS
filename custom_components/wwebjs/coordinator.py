@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -174,13 +175,20 @@ class WWebJSHealthManager:
         )
         return HEALTH_RECOVERY_BACKOFF[index]
 
+    async def _restart_or_start(self, session_id: str) -> Any:
+        """Restart a session, starting it if upstream reports it missing."""
+        result = await self.api.restart_session(session_id)
+        if isinstance(result, dict) and result.get("success") is False:
+            return await self.api.start_session(session_id)
+        return result
+
     async def _async_restart(
         self,
         session_id: str,
         health: SessionHealth,
     ) -> None:
         try:
-            await self.api.restart_session(session_id)
+            await self._restart_or_start(session_id)
         except WWebJSError as err:
             health.recovery_failures += 1
             health.next_recovery = dt_util.utcnow() + self._backoff(
@@ -229,7 +237,7 @@ class WWebJSHealthManager:
 
     async def async_manual_restart(self, session_id: str) -> None:
         """Restart a session immediately and resume recovery."""
-        await self.api.restart_session(session_id)
+        await self._restart_or_start(session_id)
         health = self.get(session_id)
         health.last_restart = dt_util.utcnow()
         health.recovery_suspended = False
