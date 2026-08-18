@@ -36,6 +36,7 @@ class SessionHealth:
     recovery_count: int = 0
     recovery_failures: int = 0
     recovery_suspended: bool = False
+    recovery_suspended_reason: str | None = None
     last_checked: datetime | None = None
     last_connected: datetime | None = None
     last_restart: datetime | None = None
@@ -129,12 +130,18 @@ class WWebJSHealthManager:
                 self._mark_connected(health)
             elif health.state in HEALTH_AUTH_FAILURE_STATES:
                 health.consecutive_failures += 1
-                health.recovery_suspended = True
-                health.next_recovery = None
+                if health.recovery_suspended_reason != "manual":
+                    health.recovery_suspended = True
+                    health.recovery_suspended_reason = "authentication"
+                    health.next_recovery = None
             else:
                 health.consecutive_failures += 1
-                if health.recovery_suspended and health.state in HEALTH_TRANSIENT_STATES:
+                if (
+                    health.recovery_suspended_reason == "authentication"
+                    and health.state in HEALTH_TRANSIENT_STATES
+                ):
                     health.recovery_suspended = False
+                    health.recovery_suspended_reason = None
 
             if self._should_restart(health):
                 await self._async_restart(session_id, health)
@@ -145,6 +152,7 @@ class WWebJSHealthManager:
         health.consecutive_failures = 0
         health.recovery_failures = 0
         health.recovery_suspended = False
+        health.recovery_suspended_reason = None
         health.next_recovery = None
         health.last_connected = dt_util.utcnow()
 
@@ -204,25 +212,28 @@ class WWebJSHealthManager:
         await self.api.start_session(session_id)
         health = self.get(session_id)
         health.recovery_suspended = False
+        health.recovery_suspended_reason = None
         health.consecutive_failures = 0
         health.next_recovery = None
         await self.async_refresh()
 
     async def async_manual_stop(self, session_id: str) -> None:
-        """Stop a session and suspend automatic recovery."""
+        """Stop a session and keep automatic recovery suspended."""
         await self.api.stop_session(session_id)
         health = self.get(session_id)
         health.state = "STOPPED"
         health.recovery_suspended = True
+        health.recovery_suspended_reason = "manual"
         health.next_recovery = None
         self._notify_listeners()
 
     async def async_manual_restart(self, session_id: str) -> None:
-        """Restart a session immediately."""
+        """Restart a session immediately and resume recovery."""
         await self.api.restart_session(session_id)
         health = self.get(session_id)
         health.last_restart = dt_util.utcnow()
         health.recovery_suspended = False
+        health.recovery_suspended_reason = None
         health.consecutive_failures = 0
         health.next_recovery = None
         health.state = "RESTARTING"
