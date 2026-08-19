@@ -28,7 +28,6 @@ async def async_setup_entry(
     health: WWebJSHealthManager = runtime.health
     history: WWebJSHistoryManager = hass.data[DOMAIN]["history"]
 
-    entities: list[SensorEntity] = []
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_TYPE_SESSION:
             continue
@@ -36,15 +35,22 @@ async def async_setup_entry(
         if not session_id:
             continue
         session_id = str(session_id)
-        entities.extend(
-            [
-                WWebJSSessionStatusSensor(health, entry, session_id),
-                WWebJSRecoveryCountSensor(health, entry, session_id),
-                WWebJSMessageHistorySensor(history, entry, session_id),
-            ]
-        )
+        subentry_id = subentry.subentry_id
 
-    async_add_entities(entities)
+        async_add_entities(
+            [
+                WWebJSSessionStatusSensor(
+                    health, entry, subentry_id, session_id
+                ),
+                WWebJSRecoveryCountSensor(
+                    health, entry, subentry_id, session_id
+                ),
+                WWebJSMessageHistorySensor(
+                    history, entry, subentry_id, session_id
+                ),
+            ],
+            config_subentry_id=subentry_id,
+        )
 
 
 class WWebJSBaseSensor(SensorEntity):
@@ -52,8 +58,14 @@ class WWebJSBaseSensor(SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: ConfigEntry, session_id: str) -> None:
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        subentry_id: str,
+        session_id: str,
+    ) -> None:
         self.session_id = session_id
+        self._attr_config_subentry_id = subentry_id
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry.entry_id}:{session_id}")},
             name=f"WWebJS – {session_id}",
@@ -69,9 +81,10 @@ class WWebJSHealthSensor(WWebJSBaseSensor):
         self,
         health: WWebJSHealthManager,
         entry: ConfigEntry,
+        subentry_id: str,
         session_id: str,
     ) -> None:
-        super().__init__(entry, session_id)
+        super().__init__(entry, subentry_id, session_id)
         self.health = health
         self._remove_listener = None
 
@@ -102,9 +115,10 @@ class WWebJSSessionStatusSensor(WWebJSHealthSensor):
         self,
         health: WWebJSHealthManager,
         entry: ConfigEntry,
+        subentry_id: str,
         session_id: str,
     ) -> None:
-        super().__init__(health, entry, session_id)
+        super().__init__(health, entry, subentry_id, session_id)
         self._attr_unique_id = f"{entry.entry_id}_{session_id}_session_status"
 
     @property
@@ -138,9 +152,10 @@ class WWebJSRecoveryCountSensor(WWebJSHealthSensor):
         self,
         health: WWebJSHealthManager,
         entry: ConfigEntry,
+        subentry_id: str,
         session_id: str,
     ) -> None:
-        super().__init__(health, entry, session_id)
+        super().__init__(health, entry, subentry_id, session_id)
         self._attr_unique_id = f"{entry.entry_id}_{session_id}_recovery_count"
 
     @property
@@ -158,9 +173,10 @@ class WWebJSMessageHistorySensor(WWebJSBaseSensor):
         self,
         history: WWebJSHistoryManager,
         entry: ConfigEntry,
+        subentry_id: str,
         session_id: str,
     ) -> None:
-        super().__init__(entry, session_id)
+        super().__init__(entry, subentry_id, session_id)
         self.history = history
         self._remove_listener = None
         self._attr_unique_id = f"{entry.entry_id}_{session_id}_message_history"
