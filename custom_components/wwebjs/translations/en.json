@@ -55,7 +55,7 @@
         },
         "reconfigure": {
           "title": "Pair / re-pair {session}",
-          "description": "Current WWebJS session state: **{state}**. Enter the WhatsApp phone number to request a new phone-number pairing code for this existing session.",
+          "description": "Current WWebJS session state: **{state}**. Re-pairing will log out and remove the stored authentication for this upstream session, start a fresh client with the same session name, and request a new phone-number pairing code.",
           "data": {
             "phone_number": "Phone number"
           },
@@ -65,15 +65,14 @@
         },
         "reconfigure_pair": {
           "title": "Link {session}",
-          "description": "In WhatsApp, open Linked devices → Link a device → Link with phone number, then enter **{pairing_code}**. After linking succeeds, press Submit."
+          "description": "The old upstream authentication has been cleared. In WhatsApp, open Linked devices → Link a device → Link with phone number, then enter **{pairing_code}**. After linking succeeds, press Submit."
         }
       },
       "error": {
         "invalid_auth": "The API key was rejected.",
         "session_setup_failed": "Unable to create or inspect the WWebJS session.",
         "session_not_available": "That session is no longer available from wwebjs-api. Reopen the sender flow to refresh the session list.",
-        "session_not_pairable": "This session is not currently in a state that supports phone-number pairing.",
-        "pairing_code_failed": "Unable to request a pairing code for this session.",
+        "pairing_code_failed": "Unable to reset the session and request a new pairing code.",
         "not_connected": "The session is not connected yet. Complete pairing on the phone and try again.",
         "invalid_session_id": "Use only letters, numbers, and hyphens.",
         "invalid_phone_number": "Enter a valid international phone number.",
