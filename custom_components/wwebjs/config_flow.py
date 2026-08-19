@@ -45,7 +45,6 @@ from .const import (
 
 CONF_SESSION_CHOICE = "session_choice"
 CREATE_NEW_SESSION = "__create_new__"
-PAIRABLE_STATES = {"UNPAIRED", "UNPAIRED_IDLE", "PAIRING"}
 
 
 def _server_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -317,14 +316,15 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
         user_input: dict[str, Any] | None = None,
     ) -> SubentryFlowResult:
         """Pair or re-pair an existing configured sender session."""
-        entry = self._get_entry()
         subentry = self._get_reconfigure_subentry()
         session_id = str(subentry.data[CONF_SESSION_ID])
         errors: dict[str, str] = {}
         state = "UNKNOWN"
 
         try:
-            state = (await self._api().get_session_status(session_id) or "UNKNOWN").upper()
+            state = (
+                await self._api().get_session_status(session_id) or "UNKNOWN"
+            ).upper()
         except WWebJSAuthError:
             errors["base"] = "invalid_auth"
         except (WWebJSConnectionError, WWebJSApiError):
@@ -337,13 +337,18 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
             phone_number = normalize_phone_number(user_input[CONF_PHONE_NUMBER])
             if not phone_number:
                 errors[CONF_PHONE_NUMBER] = "invalid_phone_number"
-            elif state not in PAIRABLE_STATES:
-                errors["base"] = "session_not_pairable"
             else:
                 self._session_id = session_id
                 self._phone_number = phone_number
                 try:
-                    self._pairing_code = await self._api().request_pairing_code(
+                    api = self._api()
+                    # A stopped client keeps its LocalAuth credentials. For a
+                    # genuine re-pair, terminate logs out/removes that stored
+                    # authentication, then start creates a fresh client using
+                    # the same logical session ID.
+                    await api.terminate_session(session_id)
+                    await api.start_session(session_id)
+                    self._pairing_code = await api.request_pairing_code(
                         session_id,
                         phone_number,
                     )
