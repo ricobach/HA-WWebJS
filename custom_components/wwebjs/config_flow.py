@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import voluptuous as vol
@@ -45,6 +46,8 @@ from .const import (
 
 CONF_SESSION_CHOICE = "session_choice"
 CREATE_NEW_SESSION = "__create_new__"
+PAIRABLE_STATES = {"UNPAIRED", "UNPAIRED_IDLE"}
+PAIRING_READY_TIMEOUT = 45
 
 
 def _server_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -147,6 +150,53 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
             )
         }
 
+    async def _async_wait_until_pairable(
+        self,
+        api: WWebJSApi,
+        session_id: str,
+    ) -> str:
+        """Wait until a freshly started client is ready for phone pairing."""
+        last_state = "UNKNOWN"
+        for _ in range(PAIRING_READY_TIMEOUT):
+            try:
+                state = await api.get_session_status(session_id)
+            except WWebJSApiError:
+                state = None
+            if state:
+                last_state = state.upper()
+                if last_state in PAIRABLE_STATES:
+                    return last_state
+                if last_state == "CONNECTED":
+                    return last_state
+            await asyncio.sleep(1)
+        raise WWebJSApiError(
+            f"Session '{session_id}' did not become pairable within "
+            f"{PAIRING_READY_TIMEOUT} seconds (last state: {last_state})"
+        )
+
+    async def _async_request_pairing_code(
+        self,
+        api: WWebJSApi,
+        session_id: str,
+        phone_number: str,
+    ) -> str:
+        """Wait for WhatsApp Web auth state and request a pairing code."""
+        state = await self._async_wait_until_pairable(api, session_id)
+        if state == "CONNECTED":
+            raise WWebJSApiError("Session became connected before pairing was requested")
+
+        last_error: WWebJSApiError | None = None
+        for _ in range(3):
+            try:
+                return await api.request_pairing_code(session_id, phone_number)
+            except WWebJSApiError as err:
+                last_error = err
+                await asyncio.sleep(2)
+
+        if last_error is not None:
+            raise last_error
+        raise WWebJSApiError("Unable to request pairing code")
+
     async def async_step_user(
         self,
         user_input: dict[str, Any] | None = None,
@@ -246,7 +296,8 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
                         )
 
                     await api.start_session(session_id)
-                    self._pairing_code = await api.request_pairing_code(
+                    self._pairing_code = await self._async_request_pairing_code(
+                        api,
                         session_id,
                         phone_number,
                     )
@@ -342,13 +393,15 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
                 self._phone_number = phone_number
                 try:
                     api = self._api()
-                    # A stopped client keeps its LocalAuth credentials. For a
-                    # genuine re-pair, terminate logs out/removes that stored
-                    # authentication, then start creates a fresh client using
-                    # the same logical session ID.
+                    # Terminate removes the stored auth state. Start then creates
+                    # a fresh client with the same logical session ID. Do not
+                    # request a pairing code until WhatsApp Web itself reports
+                    # UNPAIRED/UNPAIRED_IDLE; /session/start only waits for the
+                    # Puppeteer page to exist, which is too early.
                     await api.terminate_session(session_id)
                     await api.start_session(session_id)
-                    self._pairing_code = await api.request_pairing_code(
+                    self._pairing_code = await self._async_request_pairing_code(
+                        api,
                         session_id,
                         phone_number,
                     )
