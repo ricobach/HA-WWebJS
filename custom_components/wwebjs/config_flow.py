@@ -45,6 +45,7 @@ from .const import (
 
 CONF_SESSION_CHOICE = "session_choice"
 CREATE_NEW_SESSION = "__create_new__"
+PAIRABLE_STATES = {"UNPAIRED", "UNPAIRED_IDLE", "PAIRING"}
 
 
 def _server_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -173,9 +174,6 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
             if choice == CREATE_NEW_SESSION:
                 return await self.async_step_new()
 
-            # The selector is generated from /session/getSessions, but verify
-            # again before creating the subentry in case the session list
-            # changed while the form was open.
             if choice not in available_sessions:
                 errors["base"] = "session_not_available"
             else:
@@ -241,8 +239,6 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
                     api = self._api()
                     sessions = await api.get_sessions()
 
-                    # If the user typed the name of an already-running session,
-                    # attach to it rather than attempting to recreate it.
                     if session_id in sessions:
                         return self.async_create_entry(
                             title=session_id,
@@ -283,7 +279,7 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
         self,
         user_input: dict[str, Any] | None = None,
     ) -> SubentryFlowResult:
-        """Wait for phone-number pairing to complete."""
+        """Wait for phone-number pairing of a new session to complete."""
         errors = {}
         if user_input is not None:
             try:
@@ -307,6 +303,103 @@ class WWebJSSessionSubentryFlow(ConfigSubentryFlow):
 
         return self.async_show_form(
             step_id="pair",
+            data_schema=vol.Schema({}),
+            errors=errors,
+            description_placeholders={
+                "session": self._session_id,
+                "phone_number": self._phone_number,
+                "pairing_code": self._pairing_code,
+            },
+        )
+
+    async def async_step_reconfigure(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> SubentryFlowResult:
+        """Pair or re-pair an existing configured sender session."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        session_id = str(subentry.data[CONF_SESSION_ID])
+        errors: dict[str, str] = {}
+        state = "UNKNOWN"
+
+        try:
+            state = (await self._api().get_session_status(session_id) or "UNKNOWN").upper()
+        except WWebJSAuthError:
+            errors["base"] = "invalid_auth"
+        except (WWebJSConnectionError, WWebJSApiError):
+            errors["base"] = "session_setup_failed"
+
+        if state == "CONNECTED" and not errors:
+            return self.async_abort(reason="session_already_connected")
+
+        if user_input is not None and not errors:
+            phone_number = normalize_phone_number(user_input[CONF_PHONE_NUMBER])
+            if not phone_number:
+                errors[CONF_PHONE_NUMBER] = "invalid_phone_number"
+            elif state not in PAIRABLE_STATES:
+                errors["base"] = "session_not_pairable"
+            else:
+                self._session_id = session_id
+                self._phone_number = phone_number
+                try:
+                    self._pairing_code = await self._api().request_pairing_code(
+                        session_id,
+                        phone_number,
+                    )
+                    return await self.async_step_reconfigure_pair()
+                except WWebJSAuthError:
+                    errors["base"] = "invalid_auth"
+                except (WWebJSConnectionError, WWebJSApiError):
+                    errors["base"] = "pairing_code_failed"
+
+        suggested_phone = subentry.data.get(CONF_PHONE_NUMBER, "")
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_PHONE_NUMBER,
+                        default=(user_input or {}).get(
+                            CONF_PHONE_NUMBER,
+                            suggested_phone,
+                        ),
+                    ): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "session": session_id,
+                "state": state,
+            },
+        )
+
+    async def async_step_reconfigure_pair(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> SubentryFlowResult:
+        """Wait for re-pairing of an existing session to complete."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                state = await self._api().get_session_status(self._session_id)
+                if state == "CONNECTED":
+                    return self.async_update_and_abort(
+                        entry=entry,
+                        subentry=subentry,
+                        data_updates={CONF_PHONE_NUMBER: self._phone_number},
+                    )
+                errors["base"] = "not_connected"
+            except WWebJSAuthError:
+                errors["base"] = "invalid_auth"
+            except (WWebJSConnectionError, WWebJSApiError):
+                errors["base"] = "session_setup_failed"
+
+        return self.async_show_form(
+            step_id="reconfigure_pair",
             data_schema=vol.Schema({}),
             errors=errors,
             description_placeholders={
