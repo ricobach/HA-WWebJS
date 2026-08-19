@@ -28,7 +28,17 @@
       "step": {
         "user": {
           "title": "Add WWebJS sender",
-          "description": "Add an existing connected session or create and pair a new one.",
+          "description": "Select an existing session discovered from wwebjs-api, or choose Create a new session.",
+          "data": {
+            "session_choice": "Session"
+          },
+          "data_description": {
+            "session_choice": "Existing sessions are loaded from /session/getSessions. Sessions already attached to Home Assistant are hidden."
+          }
+        },
+        "new": {
+          "title": "Create WWebJS sender",
+          "description": "Create a new wwebjs-api session and pair it using a phone-number code.",
           "data": {
             "session_id": "Session name",
             "phone_number": "Phone number"
@@ -46,6 +56,7 @@
       "error": {
         "invalid_auth": "The API key was rejected.",
         "session_setup_failed": "Unable to create or inspect the WWebJS session.",
+        "session_not_available": "That session is no longer available from wwebjs-api. Reopen the sender flow to refresh the session list.",
         "not_connected": "The session is not connected yet. Complete pairing on the phone and try again.",
         "invalid_session_id": "Use only letters, numbers, and hyphens.",
         "invalid_phone_number": "Enter a valid international phone number.",
