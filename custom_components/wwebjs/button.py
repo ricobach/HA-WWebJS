@@ -19,7 +19,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up WWebJS session control buttons."""
     health: WWebJSHealthManager = entry.runtime_data.health
-    entities: list[ButtonEntity] = []
 
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_TYPE_SESSION:
@@ -28,15 +27,22 @@ async def async_setup_entry(
         if not session_id:
             continue
         session_id = str(session_id)
-        entities.extend(
-            [
-                WWebJSSessionButton(health, entry, session_id, "start"),
-                WWebJSSessionButton(health, entry, session_id, "restart"),
-                WWebJSSessionButton(health, entry, session_id, "stop"),
-            ]
-        )
+        subentry_id = subentry.subentry_id
 
-    async_add_entities(entities)
+        async_add_entities(
+            [
+                WWebJSSessionButton(
+                    health, entry, subentry_id, session_id, "start"
+                ),
+                WWebJSSessionButton(
+                    health, entry, subentry_id, session_id, "restart"
+                ),
+                WWebJSSessionButton(
+                    health, entry, subentry_id, session_id, "stop"
+                ),
+            ],
+            config_subentry_id=subentry_id,
+        )
 
 
 class WWebJSSessionButton(ButtonEntity):
@@ -48,12 +54,14 @@ class WWebJSSessionButton(ButtonEntity):
         self,
         health: WWebJSHealthManager,
         entry: ConfigEntry,
+        subentry_id: str,
         session_id: str,
         action: str,
     ) -> None:
         self.health = health
         self.session_id = session_id
         self.action = action
+        self._attr_config_subentry_id = subentry_id
         self._attr_name = action.capitalize()
         self._attr_unique_id = f"{entry.entry_id}_{session_id}_{action}"
         self._attr_icon = {
