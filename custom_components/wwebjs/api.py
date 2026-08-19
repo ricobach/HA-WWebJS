@@ -101,6 +101,10 @@ class WWebJSApi:
     async def stop_session(self, session_id: str) -> Any:
         return await self._request("GET", f"/session/stop/{session_id}")
 
+    async def terminate_session(self, session_id: str) -> Any:
+        """Log out and remove stored authentication for a session."""
+        return await self._request("GET", f"/session/terminate/{session_id}")
+
     async def restart_session(self, session_id: str) -> Any:
         return await self._request("GET", f"/session/restart/{session_id}")
 
